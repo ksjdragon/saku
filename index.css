@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css?family=Raleway');
+@import url('https://fonts.googleapis.com/css?family=Josefin+Sans');
+
+html {
+	font-family: 'Raleway';
+	/*background-color: #15171B;*/
+}
+
+body {
+	margin: 0;
+}
+
+#hexagon {
+	height: 300;
+}
+
+#hexagon polygon {
+	cursor: pointer;
+	fill: rgba(0,0,0,0);
+	stroke-width: 2px;
+	stroke: #D0790E;
+
+	transition: fill 0.2s ease;
+}
+
+#hexagon text {
+	fill: #D0790E;
+	pointer-events: none;
+}
+
+.hex {
+	background-color: red;
+}
+
+#hexagon polygon:hover {
+	fill: rgba(255,255,255,0.05);
+}
+
+#glCanvas {
+	border: 2px solid black;
+}
