@@ -2,19 +2,23 @@ var canvas = document.getElementById("glCanvas");
 ctx = canvas.getContext("2d");
 
 objects = {};
-
+verbose = true;
 camera = [[canvas.width/2,0,canvas.height/2],[1,1],1]; // [[Position],[Rotation(x,z)],Focal];
-triangle = [
-  [0,1,25],
-  [25,1,50],
-  [25,1,0]
-]
+
+triangle = {
+  "name": "Triangle",
+  "vertices": [
+    [0,1,25],
+    [25,1,50],
+    [25,1,0]
+  ]
+}
 
 function drawShape(shape) {
   ctx.beginPath();
+  var log = [];
   var newShape = [];
   var cP = camera[0]; // Camera Position
-  console.log(cP);
   var cR = camera[1]; // Camera Rotation
   var cF = camera[2];
   // Camera direction vector
@@ -23,12 +27,27 @@ function drawShape(shape) {
     Rnd(cF*Math.cos(toRad(cR[1])),3),
     Rnd(cF*Math.sin(toRad(cR[0])),3)  // 0 Degrees X points straight to Y.
   ];
-  console.log("Camera Vector: ",cV);
+
+  if(verbose) {
+    log = {
+      "Shape Name": shape.name,
+      "Camera Position": vecToObj(cP),
+      "Camera Rotation": {
+        "X": cR[0],
+        "Z": cR[1]
+      },
+      "Camera Focal": cF,
+      "Camera Vector": vecToObj(cV),
+      "Shape Vertice Values": {},
+      "Canvas Points": {}
+    }
+  }
+
   // Perspective mapping
-  for(var i = 0; i < shape.length; i++) { // Each point in 3D
-    var x = shape[i][0];
-    var y = shape[i][1];
-    var z = shape[i][2];
+  for(var i = 0; i < shape.vertices.length; i++) { // Each point in 3D
+    var x = shape.vertices[i][0];
+    var y = shape.vertices[i][1];
+    var z = shape.vertices[i][2];
     var pV = [x-cP[0],y-cP[1],z-cP[2]]; // Point direction vector
     // Restricting to X and Z dimensions and comparing to Y.
     var distPX = mag(dim("XY",pV));
@@ -36,53 +55,49 @@ function drawShape(shape) {
     var distCX = mag(dim("XY",cV));
     var distCZ = mag(dim("ZY",cV));
 
-    /* 
-      sin(acos(x)) = sqrt(1-x^2)
-      cos(acos(x)) = x
-    */
-    /*var thetaX = Rnd(Math.acos(
-      dot(dim("XZ",cV),dim("XZ",pV)) /
-      (distCX*distPX)
-    ),5);
-    var thetaY = Rnd(Math.acos(
-      dot(dim("YZ",cV),dim("YZ",pV)) /
-      (distCY*distPY)
-    ),5);
-    var oppX = distPX * Math.sin(thetaX);
-    var oppY = distPY * Math.sin(thetaY);
+    /* Adjacent and Opposite calculated with math simplifications 
+        cos(arccosx) = x
+        sin(arccosx) = sqrt(1-x^2)
     */
 
-    var adjX = dot(dim("XY",cV),dim("XY",pV)) / distCX;
+    var adjX = dot(dim("XY",cV),dim("XY",pV)) / distCX; 
     var adjZ = dot(dim("ZY",cV),dim("ZY",pV)) / distCZ;
     
     var oppX = distPX * Math.sqrt(1-Math.pow(adjX/distPX,2));
     var oppZ = distPZ * Math.sqrt(1-Math.pow(adjZ/distPZ,2));
 
-    var projOppX = distCX*oppX/adjX; // Represents X
-    var projOppZ = distCZ*oppZ/adjZ; // Represents Y
+    var projOppX = distCX*oppX/adjX; // Represents X in projective plane.
+    var projOppZ = distCZ*oppZ/adjZ; // Represents Y in projective plane.
     // If the dot product is greater than 0, b is on the right of a.
     if(adjX > 0) projOppX *= -1; 
     if(adjZ < 0) projOppZ *= -1;
 
-    console.log("--------\nPoint Position: ", shape[i],
-      "\nPosition Vector " + i + ": ", pV,
-      "\nDistancePXY: ", distPX, 
-      "\nDistancePZY: ", distPZ, 
-      "\nDistanceCXY: ", distCX, 
-      "\nDistanceCZY: ", distCZ,
-      "\nAdjacentXY: ", adjX,
-      "\nAdjacentZY: ", adjZ,
-      "\nOppositeXY: ", oppX, 
-      "\nOppositeZY: ", oppZ,
-      "\nProjectedOppXY: ", projOppX,
-      "\nProjectedOppZY: ", projOppZ
-    );
+    var canvasPointX = Rnd(cP[0]+projOppX,3);
+    var canvasPointY = Rnd(cP[2]+projOppZ,3)
 
-    newShape.push([Rnd(cP[0]+projOppX,3),Rnd(cP[2]+projOppZ,3)]);
+    if(verbose) {
+      var num  = "Point " + (i+1).toString();
+      log["Shape Vertice Values"][num] = {
+        "Point Position": vecToObj(shape.vertices[i]),
+        "Position Vector": vecToObj(pV),
+        "DistancePXY": distPX,
+        "DistancePZY": distPZ, 
+        "DistanceCXY": distCX, 
+        "DistanceCZY": distCZ,
+        "AdjacentXY": adjX,
+        "AdjacentZY": adjZ,
+        "OppositeXY": oppX, 
+        "OppositeZY": oppZ,
+        "ProjectedOppXY": projOppX,
+        "ProjectedOppZY": projOppZ
+      };
+      log["Canvas Points"][num] = vecToObj([canvasPointX, canvasPointY]);
+    }
+    newShape.push([canvasPointX, canvasPointY]);
   }
-  console.log(newShape);
+  if(verbose) console.log(log);
   ctx.moveTo(newShape[0][0],newShape[0][1]);
-  for(var i = 1; i < shape.length; i++) {
+  for(var i = 1; i < shape.vertices.length; i++) {
     ctx.lineTo(newShape[i][0],newShape[i][1]);
   } 
   ctx.fill();
@@ -140,6 +155,15 @@ function SizeMismatch(message, obj) {
   this.mesage = message;
   this.name = "SizeMismatch";
   this.matrix = obj;
+}
+
+function vecToObj(vec) {
+  var obj = {};
+  var ref = ["X","Y","Z"];
+  for(var i = 0; i < vec.length; i++) {
+    obj[ref[i]] = vec[i];
+  }
+  return obj;
 }
 
 drawShape(triangle);
