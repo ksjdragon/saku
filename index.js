@@ -1,21 +1,97 @@
-var canvas = document.getElementById("glCanvas");
-ctx = canvas.getContext("2d");
+Saku = {
+  Scene: function() {
+    this.objects = [];
+    this.addObject = function(obj) {
+      var invalid = [varType(obj) !== "Object", varType(obj)];
+      if(varType(obj) !== "Object") throw TypeError("Expected Object as argument; Got " + invalid[1] + ".");
 
-objects = {};
-verbose = true;
-camera = [[canvas.width/2,0,canvas.height/2],[1,1],1]; // [[Position],[Rotation(x,z)],Focal];
+      this.objects.push(obj);
+    }
+  },
+  Object: function(vertices, name) {
+    if(vertices === undefined) throw TypeError("Not enough arguments; Expected Array as argument.");
+    var invalid = [[varType(vertices) !== "Array", varType(vertices)]];
+    invalid[1] = vertices.every(function(element) { return varType(element) !== "Array"; });
+    invalid[2] = invalid[1] || vertices.every(function(element) { return element.every(function(number) { return isNaN(number); }); });
+    if(invalid[0][0]) throw TypeError("Expected Array as argument; Got " + invalid[0][1]);
+    if(invalid[1]) throw TypeError("Expected Arrays as 1st dimensional element.");
+    if(invalid[2]) throw TypeError("Expected Number as 2nd dimensional element.");
 
-triangle = {
-  "name": "Triangle",
-  "vertices": [
-    [0,1,25],
-    [25,1,50],
-    [25,1,0]
-  ]
+    this.name = name || "Unnamed Object";
+    this.vertices = vertices;
+
+    this.translateX = function(value) {
+      this.vertices.forEach(function(ele, index, arr) {
+        arr[index][0] = ele[0] + value;
+      });
+    }
+
+    this.translateY = function(value) {
+      this.vertices.forEach(function(ele, index, arr) {
+        arr[index][1] = ele[1] + value;
+      });
+    }
+
+    this.translateZ = function(value) {
+      this.vertices.forEach(function(ele, index, arr) {
+        arr[index][2] = ele[2] + value;
+      });
+    }
+
+    this.translate = function(value) {
+      this.vertices.forEach(function(ele, index, arr) {
+        arr[index][0] = ele[0] + value;
+        arr[index][1] = ele[1] + value;
+        arr[index][2] = ele[2] + value;
+      });
+    }
+  }
 }
 
-function drawShape(shape) {
-  ctx.beginPath();
+Saku["Triangle"] = function(name) {
+  Saku.Object.call(this, [
+    [500,4,500],
+    [250,4,800],
+    [250,4,600]
+  ], (name || "Triangle"));
+  this.prototype = Object.create(Saku.Object.prototype);
+}
+
+Saku["Square"] = function(name) {
+  Saku.Object.call(this, [
+    [1000,4,600],
+    [1500,4,600],
+    [1500,4,1100],
+    [1000,4,1100] 
+  ], (name || "Square"));
+  this.prototype = Object.create(Saku.Object.prototype);
+}
+
+function varType(variable) {
+  var type = typeof variable;
+  if(type === "object") {
+      return (variable.constructor === Array) ? "Array" : "Object";  
+  } else {
+    return type[0].toUpperCase() + type.slice(1);
+  }
+}
+
+function updateFrame() {
+  ctx.clearRect(0,0,canvas.width,canvas.height)
+  for(var i = 0; i < scene.objects.length; i++) {
+    var object = scene.objects[i];
+    object = projectObj(object);
+    ctx.beginPath();
+    ctx.moveTo(object[0][0],object[0][1]);
+    for(var j = 1; j < object.length; j++) {
+      ctx.lineTo(object[j][0],object[j][1]);
+    } 
+    ctx.fill();
+    
+  }
+}
+
+function projectObj(object) {
   var log = [];
   var newShape = [];
   var cP = camera[0]; // Camera Position
@@ -30,7 +106,7 @@ function drawShape(shape) {
 
   if(verbose) {
     log = {
-      "Shape Name": shape.name,
+      "Object Name": object.name,
       "Camera Position": vecToObj(cP),
       "Camera Rotation": {
         "X": cR[0],
@@ -38,16 +114,16 @@ function drawShape(shape) {
       },
       "Camera Focal": cF,
       "Camera Vector": vecToObj(cV),
-      "Shape Vertice Values": {},
+      "Object Vertice Values": {},
       "Canvas Points": {}
     }
   }
 
   // Perspective mapping
-  for(var i = 0; i < shape.vertices.length; i++) { // Each point in 3D
-    var x = shape.vertices[i][0];
-    var y = shape.vertices[i][1];
-    var z = shape.vertices[i][2];
+  for(var i = 0; i < object.vertices.length; i++) { // Each point in 3D
+    var x = object.vertices[i][0];
+    var y = object.vertices[i][1];
+    var z = object.vertices[i][2];
     var pV = [x-cP[0],y-cP[1],z-cP[2]]; // Point direction vector
     // Restricting to X and Z dimensions and comparing to Y.
     var distPX = mag(dim("XY",pV));
@@ -77,8 +153,8 @@ function drawShape(shape) {
 
     if(verbose) {
       var num  = "Point " + (i+1).toString();
-      log["Shape Vertice Values"][num] = {
-        "Point Position": vecToObj(shape.vertices[i]),
+      log["Object Vertice Values"][num] = {
+        "Point Position": vecToObj(object.vertices[i]),
         "Position Vector": vecToObj(pV),
         "DistancePXY": distPX,
         "DistancePZY": distPZ, 
@@ -96,11 +172,7 @@ function drawShape(shape) {
     newShape.push([canvasPointX, canvasPointY]);
   }
   if(verbose) console.log(log);
-  ctx.moveTo(newShape[0][0],newShape[0][1]);
-  for(var i = 1; i < shape.vertices.length; i++) {
-    ctx.lineTo(newShape[i][0],newShape[i][1]);
-  } 
-  ctx.fill();
+  return newShape;
 }
 
 function toRad(deg) {
@@ -160,10 +232,26 @@ function SizeMismatch(message, obj) {
 function vecToObj(vec) {
   var obj = {};
   var ref = ["X","Y","Z"];
-  for(var i = 0; i < vec.length; i++) {
-    obj[ref[i]] = vec[i];
-  }
+  vec.forEach(function(part) {
+    obj[ref[part]] = vec[part];
+  });
   return obj;
 }
 
-drawShape(triangle);
+var canvas = document.getElementById("glCanvas");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+ctx = canvas.getContext("2d");
+
+drawObjects = [];
+verbose = false;
+camera = [[canvas.width/2,0,canvas.height/2],[0,0],1]; // [[Position],[Rotation(x,z)],Focal];
+
+scene = new Saku.Scene();
+var triangle = new Saku.Triangle();
+var square = new Saku.Square();
+
+scene.addObject(triangle);
+scene.addObject(square);
+
+setInterval(updateFrame, 500);
