@@ -1,5 +1,13 @@
+//temp scaling 1 = 1 centimeter
+// 1 centimeter = 100px
+
 Saku = {
-  Scene: function() {
+  Scene: function(canvas, pixelScale, globalScale) {
+    //invalid
+    this.canvas = canvas;
+    this.globalScale = "centimeter";
+    this.pixelScale = pixelScale || 100;
+    this.camera = undefined;
     this.objects = [];
     this.addObject = function(obj) {
       var invalid = [varType(obj) !== "Object", varType(obj)];
@@ -7,6 +15,16 @@ Saku = {
 
       this.objects.push(obj);
     }
+    this.setCamera = function(cam) {
+      //invalid
+      this.camera = cam;
+    }
+  },
+  Camera: function(pos, rot, foc) {
+    //invalid
+    this.position = pos || [0,0,0];
+    this.rotation = rot || [0,0];
+    this.focal = foc || 0.35;
   },
   Object: function(vertices, name) {
     if(vertices === undefined) throw TypeError("Not enough arguments; Expected Array as argument.");
@@ -50,19 +68,19 @@ Saku = {
 
 Saku["Triangle"] = function(name) {
   Saku.Object.call(this, [
-    [500,4,500],
-    [250,4,800],
-    [250,4,600]
+    [0,4,0],
+    [0,4,5],
+    [3,4,3]
   ], (name || "Triangle"));
   this.prototype = Object.create(Saku.Object.prototype);
 }
 
 Saku["Square"] = function(name) {
   Saku.Object.call(this, [
-    [1000,4,600],
-    [1500,4,600],
-    [1500,4,1100],
-    [1000,4,1100] 
+    [0,4,60],
+    [20,4,60],
+    [0,4,80],
+    [20,4,80] 
   ], (name || "Square"));
   this.prototype = Object.create(Saku.Object.prototype);
 }
@@ -76,27 +94,28 @@ function varType(variable) {
   }
 }
 
-function updateFrame() {
+function updateFrame(scene) {
+  var ctx = document.getElementById(scene.canvas).getContext("2d");
   ctx.clearRect(0,0,canvas.width,canvas.height)
   for(var i = 0; i < scene.objects.length; i++) {
     var object = scene.objects[i];
-    object = projectObj(object);
+    object = projectObj(object, scene);
+    console.log(object);
     ctx.beginPath();
     ctx.moveTo(object[0][0],object[0][1]);
     for(var j = 1; j < object.length; j++) {
       ctx.lineTo(object[j][0],object[j][1]);
     } 
-    ctx.fill();
-    
+    ctx.fill(); 
   }
 }
 
-function projectObj(object) {
+function projectObj(object, scene) {
   var log = [];
   var newShape = [];
-  var cP = camera[0]; // Camera Position
-  var cR = camera[1]; // Camera Rotation
-  var cF = camera[2];
+  var cP = scene.camera.position;
+  var cR = scene.camera.rotation;
+  var cF = scene.camera.focal;
   // Camera direction vector
   var cV = [
     Rnd(cF*Math.sin(toRad(cR[1])),3), // 0 Degrees Z points straight to Y.
@@ -148,8 +167,9 @@ function projectObj(object) {
     if(adjX > 0) projOppX *= -1; 
     if(adjZ < 0) projOppZ *= -1;
 
-    var canvasPointX = Rnd(cP[0]+projOppX,3);
-    var canvasPointY = Rnd(cP[2]+projOppZ,3)
+    var canvas = document.getElementById(scene.canvas);
+    var canvasPointX = Rnd(canvas.width/2+projOppX*scene.pixelScale,3);
+    var canvasPointY = Rnd(canvas.height/2+projOppZ*scene.pixelScale,3);
 
     if(verbose) {
       var num  = "Point " + (i+1).toString();
@@ -232,8 +252,8 @@ function SizeMismatch(message, obj) {
 function vecToObj(vec) {
   var obj = {};
   var ref = ["X","Y","Z"];
-  vec.forEach(function(part) {
-    obj[ref[part]] = vec[part];
+  vec.forEach(function(part, index) {
+    obj[ref[index]] = part;
   });
   return obj;
 }
@@ -241,17 +261,17 @@ function vecToObj(vec) {
 var canvas = document.getElementById("glCanvas");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-ctx = canvas.getContext("2d");
 
 drawObjects = [];
-verbose = false;
-camera = [[canvas.width/2,0,canvas.height/2],[0,0],1]; // [[Position],[Rotation(x,z)],Focal];
+verbose = true; // [[Position],[Rotation(x,z)],Focal];
 
-scene = new Saku.Scene();
+scene = new Saku.Scene("glCanvas");
 var triangle = new Saku.Triangle();
 var square = new Saku.Square();
+var camera = new Saku.Camera();
+scene.setCamera(camera);
 
 scene.addObject(triangle);
 scene.addObject(square);
 
-setInterval(updateFrame, 500);
+setInterval(updateFrame(scene), 500);
