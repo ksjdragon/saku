@@ -26,17 +26,18 @@ Saku = {
     this.rotation = rot || [0,0];
     this.focal = foc || 0.35;
   },
-  Object: function(vertices, name) {
+  Object: function(vertices, options) {
     if(vertices === undefined) throw TypeError("Not enough arguments; Expected Array as argument.");
     var invalid = [[varType(vertices) !== "Array", varType(vertices)]];
     invalid[1] = vertices.every(function(element) { return varType(element) !== "Array"; });
     invalid[2] = invalid[1] || vertices.every(function(element) { return element.every(function(number) { return isNaN(number); }); });
     if(invalid[0][0]) throw TypeError("Expected Array as argument; Got " + invalid[0][1]);
     if(invalid[1]) throw TypeError("Expected Arrays as 1st dimensional element.");
-    if(invalid[2]) throw TypeError("Expected Number as 2nd dimensional element.");
+    if(invalid[2]) throw TypeError("Expected Numbers as 2nd dimensional element.");
 
-    this.name = name || "Unnamed Object";
+    this.name = options.name || "Unnamed Object";
     this.vertices = vertices;
+    this.origin = options.origin || getOrigin(vertices);
 
     this.translateX = function(value) {
       this.vertices.forEach(function(ele, index, arr) {
@@ -68,20 +69,20 @@ Saku = {
 
 Saku["Triangle"] = function(name) {
   Saku.Object.call(this, [
-    [0,4,0],
-    [0,4,5],
-    [3,4,3]
-  ], (name || "Triangle"));
+    [0,2,0],
+    [0,2,5],
+    [3,2,3]
+  ], {name: (name || "Triangle")});
   this.prototype = Object.create(Saku.Object.prototype);
 }
 
 Saku["Square"] = function(name) {
   Saku.Object.call(this, [
-    [0,4,60],
-    [20,4,60],
-    [0,4,80],
-    [20,4,80] 
-  ], (name || "Square"));
+    [0,1,5],
+    [5,1,5],
+    [5,1,10],
+    [0,1,10] 
+  ], {name: (name || "Square")});
   this.prototype = Object.create(Saku.Object.prototype);
 }
 
@@ -94,13 +95,22 @@ function varType(variable) {
   }
 }
 
+function getOrigin(vert) {
+  var origin = [0,0,0];
+  for(var i = 0; i < vert[0].length; i++) {
+    for(var j = 0; j < vert.length; j++) origin[i] += vert[j][i];
+    origin[i] /= Rnd(vert.length,3);
+  }
+  return origin;
+}
+
 function updateFrame(scene) {
   var ctx = document.getElementById(scene.canvas).getContext("2d");
   ctx.clearRect(0,0,canvas.width,canvas.height)
   for(var i = 0; i < scene.objects.length; i++) {
     var object = scene.objects[i];
     object = projectObj(object, scene);
-    console.log(object);
+
     ctx.beginPath();
     ctx.moveTo(object[0][0],object[0][1]);
     for(var j = 1; j < object.length; j++) {
@@ -133,6 +143,7 @@ function projectObj(object, scene) {
       },
       "Camera Focal": cF,
       "Camera Vector": vecToObj(cV),
+      "Object Origin": vecToObj(object.origin),
       "Object Vertice Values": {},
       "Canvas Points": {}
     }
@@ -163,13 +174,16 @@ function projectObj(object, scene) {
 
     var projOppX = distCX*oppX/adjX; // Represents X in projective plane.
     var projOppZ = distCZ*oppZ/adjZ; // Represents Y in projective plane.
-    // If the dot product is greater than 0, b is on the right of a.
-    if(adjX > 0) projOppX *= -1; 
-    if(adjZ < 0) projOppZ *= -1;
+    // If the dot product of a and b rotated -pi/2 is greater than 0, b is on the right of a.
+    var aheadX = dot([cV[0],-pV[1]],[cV[1],pV[0]]) > 0;
+    var aheadZ = dot([cV[2],-pV[1]],[cV[1],pV[2]]) > 0;
+
+    if(aheadX) projOppX *= -1;
+    if(aheadZ) projOppZ *= -1;
 
     var canvas = document.getElementById(scene.canvas);
     var canvasPointX = Rnd(canvas.width/2+projOppX*scene.pixelScale,3);
-    var canvasPointY = Rnd(canvas.height/2+projOppZ*scene.pixelScale,3);
+    var canvasPointY = Rnd(canvas.height/2-projOppZ*scene.pixelScale,3);
 
     if(verbose) {
       var num  = "Point " + (i+1).toString();
@@ -263,7 +277,7 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 drawObjects = [];
-verbose = true; // [[Position],[Rotation(x,z)],Focal];
+verbose = false; // [[Position],[Rotation(x,z)],Focal];
 
 scene = new Saku.Scene("glCanvas");
 var triangle = new Saku.Triangle();
@@ -274,4 +288,4 @@ scene.setCamera(camera);
 scene.addObject(triangle);
 scene.addObject(square);
 
-setInterval(updateFrame(scene), 500);
+setInterval(function() { updateFrame(scene); }, 500);
