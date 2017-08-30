@@ -128,8 +128,8 @@ function projectObj(object, scene) {
   var cF = scene.camera.focal;
   // Camera direction vector
   var cV = [
-    Rnd(cF*Math.sin(toRad(cR[1])),3), // 0 Degrees Z points straight to Y.
-    Rnd(cF*Math.cos(toRad(cR[1])),3),
+    Rnd(cF*Math.cos(toRad(cR[0]))*Math.sin(toRad(cR[1])),3), // 0 Degrees Z points straight to Y.
+    Rnd(cF*Math.cos(toRad(cR[0]))*Math.cos(toRad(cR[1])),3),
     Rnd(cF*Math.sin(toRad(cR[0])),3)  // 0 Degrees X points straight to Y.
   ];
 
