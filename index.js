@@ -6,7 +6,7 @@ Saku = {
     //invalid
     this.canvas = canvas;
     this.globalScale = "centimeter";
-    this.pixelScale = pixelScale || 100;
+    this.pixelScale = pixelScale || 1000;
     this.camera = undefined;
     this.objects = [];
     this.addObject = function(obj) {
@@ -20,11 +20,12 @@ Saku = {
       this.camera = cam;
     }
   },
-  Camera: function(pos, rot, foc) {
+  Camera: function(pos, rot, foc, size) {
     //invalid
     this.position = pos || [0,0,0];
     this.rotation = rot || [0,0];
     this.focal = foc || 0.35;
+    this.size = size || 0.32;
   },
   Object: function(vertices, options) {
     if(vertices === undefined) throw TypeError("Not enough arguments; Expected Array as argument.");
@@ -69,19 +70,19 @@ Saku = {
 
 Saku["Triangle"] = function(name) {
   Saku.Object.call(this, [
-    [0,2,0],
-    [0,2,5],
-    [3,2,3]
+    [0,50,0],
+    [0,50,5],
+    [3,50,3]
   ], {name: (name || "Triangle")});
   this.prototype = Object.create(Saku.Object.prototype);
 }
 
 Saku["Square"] = function(name) {
   Saku.Object.call(this, [
-    [0,1,5],
-    [5,1,5],
-    [5,1,10],
-    [0,1,10] 
+    [0,50,5],
+    [5,50,5],
+    [5,50,10],
+    [0,50,10] 
   ], {name: (name || "Square")});
   this.prototype = Object.create(Saku.Object.prototype);
 }
@@ -123,6 +124,7 @@ function updateFrame(scene) {
 function projectObj(object, scene) {
   var log = [];
   var newShape = [];
+  var canvas = document.getElementById(scene.canvas);
   var cP = scene.camera.position;
   var cR = scene.camera.rotation;
   var cF = scene.camera.focal;
@@ -163,27 +165,29 @@ function projectObj(object, scene) {
 
     /* Adjacent and Opposite calculated with math simplifications 
         cos(arccosx) = x
-        sin(arccosx) = sqrt(1-x^2)
+        sin(arccosx) = sqrt(1-x^2) or Pythagorean theorem
     */
 
-    var adjX = dot(dim("XY",cV),dim("XY",pV)) / distCX; 
-    var adjZ = dot(dim("ZY",cV),dim("ZY",pV)) / distCZ;
+    var adjX = Rnd(dot(dim("XY",cV),dim("XY",pV)) / distCX,5); 
+    var adjZ = Rnd(dot(dim("ZY",cV),dim("ZY",pV)) / distCZ,5);
     
-    var oppX = distPX * Math.sqrt(1-Math.pow(adjX/distPX,2));
-    var oppZ = distPZ * Math.sqrt(1-Math.pow(adjZ/distPZ,2));
+    var oppX = Math.sqrt(Math.pow(distPX,2) - Math.pow(adjX,2));
+    var oppZ = Math.sqrt(Math.pow(distPZ,2) - Math.pow(adjZ,2));
 
-    var projOppX = distCX*oppX/adjX; // Represents X in projective plane.
-    var projOppZ = distCZ*oppZ/adjZ; // Represents Y in projective plane.
-    // If the dot product of a and b rotated -pi/2 is greater than 0, b is on the right of a.
-    var aheadX = dot([cV[0],-pV[1]],[cV[1],pV[0]]) > 0;
-    var aheadZ = dot([cV[2],-pV[1]],[cV[1],pV[2]]) > 0;
+    var projOppX = Rnd(distCX*oppX/adjX,5); // Represents X in projective plane.
+    var projOppZ = Rnd(distCZ*oppZ/adjZ,5); // Represents Y in projective plane.
+    // If the dot product of a and (b rotated -pi/2) is greater than 0, b is on the right of a.
+    var aheadX = dot([cV[0],cV[1]],[-pV[1],pV[0]]);
+    var aheadZ = dot([cV[2],cV[1]],[-pV[1],pV[2]]);
 
-    if(aheadX) projOppX *= -1;
-    if(aheadZ) projOppZ *= -1;
+    if(aheadX < 0) projOppX *= -1;
+    if(aheadZ > 0) projOppZ *= -1;
 
-    var canvas = document.getElementById(scene.canvas);
-    var canvasPointX = Rnd(canvas.width/2+projOppX*scene.pixelScale,3);
-    var canvasPointY = Rnd(canvas.height/2-projOppZ*scene.pixelScale,3);
+    projOppX += scene.camera.size/2;
+    projOppZ += (canvas.height/canvas.width)*scene.camera.size/2;
+
+    var canvasPointX = Rnd(projOppX * canvas.width/scene.camera.size,3);
+    var canvasPointY = Rnd(projOppZ * canvas.width/scene.camera.size,3);
 
     if(verbose) {
       var num  = "Point " + (i+1).toString();
@@ -199,7 +203,9 @@ function projectObj(object, scene) {
         "OppositeXY": oppX, 
         "OppositeZY": oppZ,
         "ProjectedOppXY": projOppX,
-        "ProjectedOppZY": projOppZ
+        "ProjectedOppZY": projOppZ,
+        "AheadXY": aheadX,
+        "AheadZY": aheadZ
       };
       log["Canvas Points"][num] = vecToObj([canvasPointX, canvasPointY]);
     }
@@ -289,3 +295,8 @@ scene.addObject(triangle);
 scene.addObject(square);
 
 setInterval(function() { updateFrame(scene); }, 500);
+
+function verb() {
+  verbose = true;
+  setTimeout(function() { verbose = false; }, 600);
+}
