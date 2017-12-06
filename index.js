@@ -27,7 +27,7 @@ Saku = {
     this.focal = foc || 0.35;
     this.size = size || 0.32;
   },
-  Object: function(vertices, options) {
+  Face: function(vertices, options) {
     if(vertices === undefined) throw TypeError("Not enough arguments; Expected Array as argument.");
     var invalid = [[varType(vertices) !== "Array", varType(vertices)]];
     invalid[1] = vertices.every(function(element) { return varType(element) !== "Array"; });
@@ -36,7 +36,7 @@ Saku = {
     if(invalid[1]) throw TypeError("Expected Arrays as 1st dimensional element.");
     if(invalid[2]) throw TypeError("Expected Numbers as 2nd dimensional element.");
 
-    this.name = options.name || "Unnamed Object";
+    this.name = options.name || "Unnamed Object Face";
     this.vertices = vertices;
     this.origin = options.origin || getOrigin(vertices);
 
@@ -65,26 +65,68 @@ Saku = {
         arr[index][2] = ele[2] + value;
       });
     }
+  },
+  Model: function(faces, connections, name) {
+    this.name = options.name || "Unnamed Object Model";
+    this.faces = faces;
+    this.connections = connections;
   }
 }
 
-Saku["Triangle"] = function(name) {
-  Saku.Object.call(this, [
-    [0,50,0],
-    [0,50,5],
-    [3,50,3]
-  ], {name: (name || "Triangle")});
-  this.prototype = Object.create(Saku.Object.prototype);
+var ref = ["Triangle", "Square", "Pentagon", "Hexagon", "Heptagon", "Octagon", "Nonagon", "Decagon"];
+
+Saku["Polygon"] = function(sides, name, size) {
+  var defArray = [];
+  var offset = !(sides%2)*Math.PI/sides;
+  for(var i = 0; i < sides; i++) {
+    defArray.push([
+      Math.sin(i*-2*Math.PI/sides+offset),
+      0,
+      Math.cos(i*-2*Math.PI/sides+offset)
+    ]);
+  }
+
+  defArray = Rnd(defArray,5);
+  Saku.Face.call(this, defArray, {name: (name || (sides > 10) ? sides+"-gon" : ref[sides-3])});
+  this.prototype = Object.create(Saku.Face.prototype);
 }
 
-Saku["Square"] = function(name) {
-  Saku.Object.call(this, [
-    [0,50,5],
-    [5,50,5],
-    [5,50,10],
-    [0,50,10] 
-  ], {name: (name || "Square")});
-  this.prototype = Object.create(Saku.Object.prototype);
+ref.forEach(function(ele, index) {
+  Saku[ele] = function(name) {
+    Saku.Polygon.call(this, index+3, name);
+    this.prototype = Object.create(Saku.Face.prototype);
+  }
+});
+
+/*Saku["Cube"] = function(name) {
+  var defArray = [
+    [-0.5, -0.5, 0.5],
+    [0.5, -0.5, 0.5],
+    []
+  ]
+}*/
+
+function arrayOperation(item, operator, amount) {
+  var operators = {
+    "+": function(x,y) {return x+y},
+    "-": function(x,y) {return x-y},
+    "*": function(x,y) {return x*y},
+    "/": function(x,y) {return x/y},
+    "^": function(x,y) {return Math.pow(x,y)},
+    "log": function(x,y) {return Math.log(x) / Math.log(y || 10)}
+  }
+  var type = varType(item);
+  if(type === "Array") {
+    var arr = [];
+    for(var i = 0; i < item.length; i++) {
+      arr[i] = arrayOperation(item[i], operator, amount);
+    }
+    return arr;
+  } else if(type === "Number") {
+    return operators[operator](item, amount);
+  } else {
+    throw new TypeError("Expected Numbers, got " + type + ".");
+  }
 }
 
 function varType(variable) {
@@ -219,8 +261,18 @@ function toRad(deg) {
   return deg/180*Math.PI;
 }
 
-function Rnd(num,fig) {
-  return Math.round(num*Math.pow(10,fig))/Math.pow(10,fig);
+function Rnd(item,fig) {
+  if(varType(item) === "Array") {
+    var arr = [];
+    for(var i = 0; i < item.length; i++) {
+      arr[i] = Rnd(item[i],fig);
+    }
+    return arr;
+  } else if(varType(item) === "Number") {
+    return Math.round(item*Math.pow(10,fig))/Math.pow(10,fig);
+  } else {
+    throw new TypeError("Expected Integers, got " + varType(item) + ".");
+  }
 }
 
 function dot(vecOne, vecTwo) {
@@ -286,13 +338,12 @@ drawObjects = [];
 verbose = false; // [[Position],[Rotation(x,z)],Focal];
 
 scene = new Saku.Scene("glCanvas");
-var triangle = new Saku.Triangle();
-var square = new Saku.Square();
+var polygon = new Saku.Polygon(3);
 var camera = new Saku.Camera();
 scene.setCamera(camera);
 
-scene.addObject(triangle);
-scene.addObject(square);
+scene.addObject(polygon);
+polygon.translateY(10);
 
 setInterval(function() { updateFrame(scene); }, 500);
 
